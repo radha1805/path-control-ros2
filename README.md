@@ -81,11 +81,39 @@ All markers go to RViz2
 
 ## Obstacle Avoidance Extension
 
-Subscribe to /scan from LiDAR. For each point within safety radius compute repulsive force vector away from obstacle. Blend with controller output: angular_vel_final = angular_vel_controller + angular_vel_repulsive. Alternatively insert virtual waypoints around obstacles and re-run spline smoother.
+### Approach 1 — Artificial Potential Fields (APF)
+- Subscribe to /scan (sensor_msgs/LaserScan)
+- For each LiDAR point closer than safety radius d0 = 0.5m, compute repulsive vector:
+  F_rep = k_rep * (1/d - 1/d0) * unit_vector_away_from_obstacle
+- Attractive force pulls robot toward lookahead point:
+  F_att = k_att * vector_to_lookahead
+- Final velocity command blends both:
+  angular_vel_final = angular_vel_controller + angular_vel_repulsive
+- Limitation: can get stuck in local minima between two obstacles
+
+### Approach 2 — Dynamic Replanning
+- When obstacle detected within threshold, pause Pure Pursuit
+- Insert a virtual waypoint offset perpendicular to path (left or right based on obstacle side)
+- Re-run cubic spline smoother with updated waypoint list
+- Resume tracking on new smooth path
+- Advantage: globally consistent path, no local minima problem
+
+### Approach 3 — Velocity Obstacle (VO)
+- Model obstacles as circles in velocity space
+- Compute set of velocities that would cause collision within time horizon T
+- Select best velocity outside that set that still moves toward goal
+- Most suitable for dynamic obstacles (moving people, other robots)
+
+### ROS2 Integration
+- Add LaserScan subscriber to trajectory_controller.py
+- Add obstacle_avoider.py as a fourth node
+- Publish on /obstacle_avoid_override topic
+- Controller listens to override and blends with normal output
+EOF
 
 ## AI Tools Used
 
-Claude (Anthropic) assisted with ROS2 boilerplate and README formatting. All core algorithms including cubic spline parameterization, trapezoidal velocity integration, proportional controller, cross-track error formula, and unit tests were implemented and verified by the developer.
+Claude (Anthropic) & ChatGPT assisted with ROS2 boilerplate and README formatting. All core algorithms including cubic spline parameterization, trapezoidal velocity integration, proportional controller, cross-track error formula, and unit tests were implemented and verified by the developer.
 
 ## File Structure
 
